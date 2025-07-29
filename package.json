@@ -10,10 +10,10 @@
   },
   "dependencies": {
     "@bsv/paymail": "^2.0.2",
-    "@bsv/sdk": "^1.6.1",
-    "@bsv/wallet-toolbox-client": "^1.4.4",
-    "next": "^15.3.4",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "@bsv/sdk": "^1.6.20",
+    "@bsv/wallet-toolbox-client": "^1.5.20",
+    "next": "^15.4.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   }
 }
