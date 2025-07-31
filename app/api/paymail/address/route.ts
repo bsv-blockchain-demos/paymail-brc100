@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrivateKey } from "@bsv/sdk"
-const key = PrivateKey.fromWif(process.env.SERVER_KEY)
+const key = PrivateKey.fromWif(process.env.SERVER_KEY || '')
 
-export async function GET(req) {
+export async function GET(req: NextRequest) {
     return NextResponse.json({
       bsvalias: '1.0',
       handle: `bridge@paymail.us`,

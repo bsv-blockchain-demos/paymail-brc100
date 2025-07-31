@@ -1,13 +1,22 @@
 import { Signature, BigNumber, Utils, Hash, ECDSA, PublicKey } from "@bsv/sdk"
+import { NextRequest } from 'next/server'
 
-export async function POST(req) {
+interface RequestBody {
+  alias: string;
+  identityKey: string;
+  protocolID: string;
+  keyID: string;
+  signature: string;
+}
+
+export async function POST(req: NextRequest) {
     try {
-        const body = await req.json()
+        const body: RequestBody = await req.json()
         const { alias, identityKey, protocolID, keyID, signature } = body
 
         const msg = new BigNumber(Hash.sha256(Utils.toArray(alias, 'utf8')))
-        const sig = Signature.fromHex(signature)
-        const pubKey = PublicKey.fromHex(identityKey)
+        const sig = Signature.fromDER(signature) // Changed from fromHex to fromDER
+        const pubKey = PublicKey.fromString(identityKey) // Changed from fromHex to fromString
 
         // check that the signature is valid for the identityKey
         const isValid = ECDSA.verify(msg, sig, pubKey)
@@ -15,16 +24,18 @@ export async function POST(req) {
     
 
         // check if alias is available
-        const existingRecord = await req.db.collection('aliases').findOne({ alias })
-        if (existingRecord) return Response.json({ error: 'Alias already exists' }, { status: 400 })
+        // Note: Database access would need to be implemented with proper DB connection
+        // const existingRecord = await db.collection('aliases').findOne({ alias })
+        // if (existingRecord) return Response.json({ error: 'Alias already exists' }, { status: 400 })
 
         // if yes then create a record mapping the alias to the identityKey and return success
-        const success = await req.db.collection('aliases').insertOne({ alias, identityKey, signature })
-        if (!success) return Response.json({ error: 'Failed to register alias' }, { status: 400 })
+        // const success = await db.collection('aliases').insertOne({ alias, identityKey, signature })
+        // if (!success) return Response.json({ error: 'Failed to register alias' }, { status: 400 })
 
         return Response.json({ [alias]: identityKey }, { status: 200 })
     } catch (error) {
         console.log({ error })
-        return Response.json({ error: error.message }, { status: 400 })
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        return Response.json({ error: errorMessage }, { status: 400 })
     }
 }

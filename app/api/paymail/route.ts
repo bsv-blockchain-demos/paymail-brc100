@@ -1,5 +1,6 @@
+import { NextRequest } from 'next/server'
 
-export async function GET(req) {
+export async function GET(req: NextRequest) {
     return Response.json({ 
         bsvalias: '1.0',
         capabilities: {
