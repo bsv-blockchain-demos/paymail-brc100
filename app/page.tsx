@@ -1,18 +1,45 @@
 'use client'
-import { useState, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import { PrivateKey, Transaction, ARC, P2PKH, Script } from '@bsv/sdk'
+
+interface UTXO {
+  txid: string;
+  vout: number;
+  satoshis: number;
+  script: string;
+}
+
+interface PaymailResponse {
+  outputs?: Array<{ satoshis: number; script: string }>;
+  reference?: string;
+  txid?: string;
+  error?: string;
+}
+
+interface WocUtxo {
+  tx_hash: string;
+  tx_pos: number;
+  value: number;
+}
+
+interface WocResponse {
+  result?: WocUtxo[];
+  script?: string;
+}
 
 const arc = new ARC('https://arc.taal.com', process.env.API_KEY)
 
 // https://api.whatsonchain.com/v1/bsv/main/exchangerate
 class WocClient {
+    private api: string;
+    private key: string | undefined;
+
     constructor() {
         this.api = 'https://api.whatsonchain.com/v1/bsv/main'
         this.key = process.env.API_KEY
-        return this
     }
 
-    async getJson(route) {
+    async getJson(route: string): Promise<WocResponse> {
         return await (await fetch(this.api + route, {
             method: 'GET',
             headers: {
@@ -22,7 +49,7 @@ class WocClient {
         })).json()
     }
 
-    async get(route) {
+    async get(route: string): Promise<string> {
         return await (await fetch(this.api + route, {
             method: 'GET',
             headers: {
@@ -32,7 +59,7 @@ class WocClient {
         })).text()
     }
 
-    async post(route, body) {
+    async post(route: string, body: any): Promise<any> {
         return await (await fetch(this.api + route, {
             method: 'POST',
             headers: {
@@ -44,10 +71,10 @@ class WocClient {
         })).json()
     }
 
-    async getUtxos(address) {
+    async getUtxos(address: string): Promise<UTXO[]> {
         console.log({ getUtxo: address })
-        let confirmed = { results: [] }
-        let unconfirmed = { results: [] }
+        let confirmed: WocResponse = { result: [] }
+        let unconfirmed: WocResponse = { result: [] }
         try {
             confirmed = await this.getJson(`/address/${address}/confirmed/unspent`)
         } catch (error) {
@@ -58,25 +85,25 @@ class WocClient {
         } catch (error) {
             console.log({ error })
         }
-        const combined = []
-        confirmed?.result?.map(utxo => combined.push(utxo))
-        unconfirmed?.result?.map(utxo => combined.push(utxo))
+        const combined: WocUtxo[] = []
+        confirmed?.result?.map((utxo: WocUtxo) => combined.push(utxo))
+        unconfirmed?.result?.map((utxo: WocUtxo) => combined.push(utxo))
         const script = confirmed?.script || unconfirmed?.script || ''
-        const formatted = combined.map(u => ({ txid: u.tx_hash, vout: u.tx_pos, satoshis: u.value, script }))
+        const formatted: UTXO[] = combined.map((u: WocUtxo) => ({ txid: u.tx_hash, vout: u.tx_pos, satoshis: u.value, script }))
         console.log({ confirmed, unconfirmed, combined, formatted })
         return formatted
     }
 
-    async getTx(txid) {
+    async getTx(txid: string): Promise<string> {
         return this.get(`/tx/${txid}/hex`)
     }
 
-    async getMerklePath(txid) {
+    async getMerklePath(txid: string): Promise<any> {
         return this.getJson(`/tx/${txid}/tsc`)
     }
 }
 
-const post = async body => {
+const post = async (body: any): Promise<PaymailResponse> => {
     return await (await fetch('/api', {
         method: 'POST',
         headers: {
@@ -98,7 +125,7 @@ export default function Home() {
 
     const checkPaymail = async () => {
         try {
-            const paymail = paymailInput?.current?.value
+            const paymail = paymailInput?.current?.value || ''
             const pki = await post({ paymail, method: 'pki' })
             console.log({ pki })
             setPaymail(paymail)
@@ -110,14 +137,14 @@ export default function Home() {
 
     const sweepFunds = async () => {
         try {
-            const w = wifInput?.current?.value
+            const w = wifInput?.current?.value || ''
             setWif(w)
             // app requests utxos at a specific address
             const privKey = PrivateKey.fromWif(w)
             const address = privKey.toAddress()
             const utxos = await wc.getUtxos(address)
             console.log({ utxos })
-            const satoshis = utxos.reduce((a, b) => a + b.satoshis, 0) - 10
+            const satoshis = utxos.reduce((a: number, b: UTXO) => a + b.satoshis, 0) - 10
             setSats(satoshis)
             console.log({ satoshis })
 
@@ -142,7 +169,7 @@ export default function Home() {
             // gets a merkle path for each (later)
             
             // builds a new tx paying to a paymail as specified using a paymail client
-            outputs.map(output => tx.addOutput({ satoshis: output.satoshis, lockingScript: Script.fromHex(output.script) }))
+            outputs.map((output: { satoshis: number; script: string }) => tx.addOutput({ satoshis: output.satoshis, lockingScript: Script.fromHex(output.script) }))
 
             await tx.sign()
 
@@ -153,7 +180,7 @@ export default function Home() {
             if (!!response.error) throw response.error
 
             // responds with txid
-            setTxid(response.txid)
+            setTxid(response.txid || '')
         } catch (error) {
             console.log({ error })
             setError(JSON.stringify(error ?? {}))
@@ -162,8 +189,8 @@ export default function Home() {
 
     // deploy
 
-    const paymailInput = useRef()
-    const wifInput = useRef()
+    const paymailInput = useRef<HTMLInputElement>(null)
+    const wifInput = useRef<HTMLInputElement>(null)
 
     // console.log({ error, paymail, wif, txid })
     // L3PVGoUsQ1PEk2ydHA39qSKndSw92RBHommq283tDvatogHZwJHR

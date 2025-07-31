@@ -1,17 +1,28 @@
 import { PaymailClient } from '@bsv/paymail'
 import { PrivateKey, Transaction } from '@bsv/sdk'
+import { NextRequest } from 'next/server'
+
+interface RequestBody {
+  paymail: string;
+  method: string;
+  data?: {
+    satoshis?: number;
+    hex?: string;
+    reference?: string;
+  };
+}
 
 const pmc = new PaymailClient()
 
-export async function POST(req) {
+export async function POST(req: NextRequest) {
     try {
-        const body = await req.json()
+        const body: RequestBody = await req.json()
         const { paymail, method, data } = body
         console.log({ paymail, method, data })
         
         const pk = PrivateKey.fromWif('L3PVGoUsQ1PEk2ydHA39qSKndSw92RBHommq283tDvatogHZwJHR')
         const publicKey = pk.toPublicKey()
-        const tx = Transaction.fromHex(data.hex)
+        const tx = Transaction.fromHex(data?.hex || '')
         const metadata = {
             sender: 'sweep@sweep.xn--nda.network',
             pubkey: publicKey.toString(),
@@ -19,13 +30,13 @@ export async function POST(req) {
             note: 'hello world'
         }
         
-        let response
+        let response: any
         switch (method) {
             case 'outputs':
-                response = await pmc.getP2pPaymentDestination(paymail, data.satoshis)
+                response = await pmc.getP2pPaymentDestination(paymail, data?.satoshis || 0)
                 break
             case 'send':
-                response = await pmc.sendTransactionP2P(paymail, data.hex, data.reference, metadata)
+                response = await pmc.sendTransactionP2P(paymail, data?.hex || '', data?.reference || '', metadata)
                 break
             case 'pki':
             default:
@@ -36,6 +47,7 @@ export async function POST(req) {
         return Response.json(response, { status: 200 })
     } catch (error) {
         console.log({ error })
-        return Response.json({ error: error.message }, { status: 400 })
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        return Response.json({ error: errorMessage }, { status: 400 })
     }
 }

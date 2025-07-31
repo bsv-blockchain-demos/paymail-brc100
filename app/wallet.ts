@@ -1,3 +1,5 @@
+import { KeyDeriver, PrivateKey, WalletStorageManager, WalletSigner, Services, Wallet, StorageClient } from "@bsv/sdk"
+
 export async function makeWallet(chain, storageURL, privateKey) {
     const keyDeriver = new KeyDeriver(new PrivateKey(privateKey, 'hex'));
     const storageManager = new WalletStorageManager(keyDeriver.identityKey);
