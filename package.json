@@ -1,7 +1,6 @@
 {
-  "name": "beef",
-  "version": "0.1.0",
-  "private": true,
+  "name": "paymail-brc100-bridge",
+  "version": "1.0.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
