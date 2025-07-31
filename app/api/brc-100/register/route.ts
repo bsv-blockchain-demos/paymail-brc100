@@ -1,26 +1,30 @@
-import { Signature, BigNumber, Utils, Hash, ECDSA, PublicKey } from "@bsv/sdk"
+import { Signature, BigNumber, Utils, ProtoWallet, ECDSA, PublicKey, WalletProtocol } from "@bsv/sdk"
 import { NextRequest } from 'next/server'
 
 interface RequestBody {
-  alias: string;
+  data: number[];
   identityKey: string;
-  protocolID: string;
+  protocolID: WalletProtocol;
   keyID: string;
-  signature: string;
+  signature: number[];
 }
 
 export async function POST(req: NextRequest) {
     try {
         const body: RequestBody = await req.json()
-        const { alias, identityKey, protocolID, keyID, signature } = body
+        const { data, identityKey, protocolID, keyID, signature } = body
 
-        const msg = new BigNumber(Hash.sha256(Utils.toArray(alias, 'utf8')))
-        const sig = Signature.fromDER(signature) // Changed from fromHex to fromDER
-        const pubKey = PublicKey.fromString(identityKey) // Changed from fromHex to fromString
+        const alias = Utils.toUTF8(data)
 
-        // check that the signature is valid for the identityKey
-        const isValid = ECDSA.verify(msg, sig, pubKey)
-        if (!isValid) return Response.json({ error: 'Invalid signature' }, { status: 400 })      
+        const wallet = new ProtoWallet('anyone')
+        const { valid } = await wallet.verifySignature({
+            data,
+            signature,
+            protocolID,
+            keyID,
+            counterparty: identityKey
+        })
+        if (!valid) return Response.json({ error: 'Invalid signature' }, { status: 400 })      
     
 
         // check if alias is available

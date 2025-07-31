@@ -58,7 +58,7 @@ export default function Home() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    alias: alias.trim(),
+                    data,
                     identityKey,
                     protocolID,
                     keyID,
