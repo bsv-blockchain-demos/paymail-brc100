@@ -107,6 +107,7 @@ export default function Home() {
         try {
             e.preventDefault()
             setCollecting(true)
+            setError('')
             const keyID = new Date().toISOString()
             const wallet = new WalletClient()
             const data = Utils.toArray('please give me my transactions', 'utf8')
@@ -141,6 +142,7 @@ export default function Home() {
                     return
                 }
 
+                const txids: string[] = []
                 result.transactions.forEach(async t => {
                     const { accepted } = await wallet.internalizeAction({
                         tx: t.tx,
@@ -159,9 +161,24 @@ export default function Home() {
                         ]
                     })
                     if (accepted) {
-                        
+                        txids.push(t.txid)
                     }
                 })
+
+                const ackResponse = await fetch('/api/brc-100/ack', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        txids
+                    })
+                })
+
+                if (!ackResponse.ok) {
+                    setError('Failed to acknowledge transactions')
+                    return
+                }
                 
                 setAlias('')
             } else {
