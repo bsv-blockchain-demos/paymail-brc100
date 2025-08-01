@@ -171,7 +171,7 @@ export default function Home() {
                     {/* Card Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 text-center">
                         <h2 className="text-2xl font-bold text-white mb-2">Register Your Alias</h2>
-                        <p className="text-blue-100">Create an alias to receieve paymail payments</p>
+                        <p className="text-blue-100">This will become your paymail for receiving BSV payments</p>
                     </div>
                     
                     {/* Card Content */}
@@ -179,7 +179,7 @@ export default function Home() {
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="space-y-3">
                                 <label htmlFor="alias" className="block text-sm font-semibold text-gray-700">
-                                    Choose Your Alias
+                                    Create Alias
                                 </label>
                                 <div className="relative">
                                     <input
@@ -187,7 +187,7 @@ export default function Home() {
                                         type="text"
                                         value={alias}
                                         onChange={(e) => setAlias(e.target.value)}
-                                        placeholder="your-alias"
+                                        placeholder="alias"
                                         disabled={loading}
                                         className="w-full px-4 py-4 pr-40 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                         autoComplete="off"
@@ -242,7 +242,7 @@ export default function Home() {
                                     <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <span className="text-green-600 font-semibold text-xs">2</span>
                                     </div>
-                                    <span className="text-gray-600">Share {alias || 'your-alias'}@{host} to receive BSV</span>
+                                    <span className="text-gray-600">Share {alias || 'alias'}@{host} to receive BSV</span>
                                 </div>
                                 <div className="flex items-center space-x-3 text-sm">
                                     <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">

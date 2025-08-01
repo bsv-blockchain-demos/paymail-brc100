@@ -1,5 +1,6 @@
 import { Signature, BigNumber, Utils, ProtoWallet, ECDSA, PublicKey, WalletProtocol } from "@bsv/sdk"
 import { NextRequest } from 'next/server'
+import { dbc } from '@/lib/db'
 
 interface RequestBody {
   data: number[];
@@ -13,6 +14,14 @@ export async function POST(req: NextRequest) {
     try {
         const body: RequestBody = await req.json()
         const { data, identityKey, protocolID, keyID, signature } = body
+
+        // Check keyID timestamp to prevent replay attacks
+        const keyIDDate = new Date(keyID)
+        const now = new Date()
+        const timeDiff = now.getTime() - keyIDDate.getTime()
+        if (timeDiff > 10000 || timeDiff < 0) {
+            return Response.json({ error: 'Request expired or invalid timestamp' }, { status: 400 })
+        }
 
         const alias = Utils.toUTF8(data)
 
@@ -28,13 +37,20 @@ export async function POST(req: NextRequest) {
     
 
         // check if alias is available
-        // Note: Database access would need to be implemented with proper DB connection
-        // const existingRecord = await db.collection('aliases').findOne({ alias })
-        // if (existingRecord) return Response.json({ error: 'Alias already exists' }, { status: 400 })
+        const aliases = await dbc('aliases')
+        const existingRecord = await aliases.findOne({ alias })
+        if (existingRecord) return Response.json({ error: 'Alias already exists' }, { status: 400 })
 
         // if yes then create a record mapping the alias to the identityKey and return success
-        // const success = await db.collection('aliases').insertOne({ alias, identityKey, signature })
-        // if (!success) return Response.json({ error: 'Failed to register alias' }, { status: 400 })
+        const success = await aliases.insertOne({ 
+            alias, 
+            data,
+            signature,
+            protocolID,
+            keyID,
+            identityKey
+        })
+        if (!success) return Response.json({ error: 'Failed to register alias' }, { status: 400 })
 
         return Response.json({ [alias]: identityKey }, { status: 200 })
     } catch (error) {
