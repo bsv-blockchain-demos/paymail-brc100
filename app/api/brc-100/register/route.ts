@@ -25,6 +25,11 @@ export async function POST(req: NextRequest) {
 
         const alias = Utils.toUTF8(data)
 
+        // Basic alias validation
+        if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
+            return Response.json({ error: 'Alias can only contain letters, numbers, hyphens, and underscores' }, { status: 400 })
+        }
+
         const wallet = new ProtoWallet('anyone')
         const { valid } = await wallet.verifySignature({
             data,
