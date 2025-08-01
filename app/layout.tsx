@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "SPV Sweeper",
-  description: "Sweep BSV funds from a private key to a paymail wallet using SPV.",
+  title: "Paymail Bridge",
+  description: "Set a paymail alias and collect payments from it to your Metanet Wallet.",
 };
 
 export default function RootLayout({

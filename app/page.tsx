@@ -266,7 +266,7 @@ export default function Home() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-50 to-cyan-100 flex items-center justify-center p-6">
-            <div className="w-full max-w-lg">
+            <div className="w-full max-w-4xl">
                 {/* Header Section */}
                 <div className="text-center mb-8">
                     <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-cyan-700 bg-clip-text text-transparent p-5">
@@ -277,113 +277,189 @@ export default function Home() {
                     </p>
                 </div>
 
-                {/* Main Card */}
-                <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
-                    {/* Card Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 text-center">
-                        <h2 className="text-2xl font-bold text-white mb-2">Register Your Alias</h2>
-                        <p className="text-blue-100">This will become your paymail for receiving BSV payments</p>
-                    </div>
-                    
-                    {/* Card Content */}
-                    <div className="p-8">
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="space-y-3">
-                                <label htmlFor="alias" className="block text-sm font-semibold text-gray-700">
-                                    Create Alias
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        id="alias"
-                                        type="text"
-                                        value={alias}
-                                        onChange={(e) => setAlias(e.target.value)}
-                                        placeholder="alias"
-                                        disabled={loading}
-                                        className="w-full px-4 py-4 pr-40 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                        autoComplete="off"
-                                    />
-                                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                                        <span className="text-gray-500 font-semibold text-lg">@{host}</span>
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-500 font-medium">
-                                    ✓ Letters, numbers, hyphens, and underscores only
-                                </p>
+                {/* Two-Step Process */}
+                <div className="grid md:grid-cols-2 gap-8">
+                    {/* Step 1: Register Alias */}
+                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+                        {/* Step 1 Header */}
+                        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 text-center relative">
+                            <div className="absolute top-4 left-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">1</span>
                             </div>
-
-                            {error && (
-                                <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
-                                    <div className="flex items-center space-x-2">
-                                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                        <p className="text-red-800 text-sm font-semibold">{error}</p>
+                            <h2 className="text-2xl font-bold text-white mb-2">Register Your Alias</h2>
+                            <p className="text-blue-100">One-time setup for your paymail address</p>
+                        </div>
+                        
+                        {/* Step 1 Content */}
+                        <div className="p-8">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="space-y-3">
+                                    <label htmlFor="alias" className="block text-sm font-semibold text-gray-700">
+                                        Create Alias
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            id="alias"
+                                            type="text"
+                                            value={alias}
+                                            onChange={(e) => setAlias(e.target.value)}
+                                            placeholder="alias"
+                                            disabled={loading}
+                                            className="w-full px-4 py-4 pr-40 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                            autoComplete="off"
+                                        />
+                                        <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                                            <span className="text-gray-500 font-semibold text-lg">@{host}</span>
+                                        </div>
                                     </div>
+                                    <p className="text-xs text-gray-500 font-medium">
+                                        ✓ Letters, numbers, hyphens, and underscores only
+                                    </p>
                                 </div>
-                            )}
 
-                            <button
-                                type="submit"
-                                disabled={loading || !alias.trim()}
-                                className="w-full py-4 text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg transform hover:scale-105"
-                            >
-                                {loading ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3 inline-block"></div>
-                                        Registering...
-                                    </>
-                                ) : (
-                                    <>
-                                        Register Alias →
-                                    </>
+                                {error && (
+                                    <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                            <p className="text-red-800 text-sm font-semibold">{error}</p>
+                                        </div>
+                                    </div>
                                 )}
-                            </button>
-                        </form>
 
-                        {/* How it works */}
-                        <div className="mt-8 pt-6 border-t border-gray-200">
-                            <h3 className="text-sm font-semibold text-gray-900 mb-4 text-center">How it works</h3>
-                            <div className="space-y-3">
-                                <div className="flex items-center space-x-3 text-sm">
-                                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                        <span className="text-blue-600 font-semibold text-xs">1</span>
+                                <button
+                                    type="submit"
+                                    disabled={loading || !alias.trim()}
+                                    className="w-full py-4 text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg transform hover:scale-105"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3 inline-block"></div>
+                                            Registering...
+                                        </>
+                                    ) : (
+                                        <>
+                                            Register Alias →
+                                        </>
+                                    )}
+                                </button>
+                            </form>
+
+                            {/* Step 1 Info */}
+                            <div className="mt-6 p-4 bg-blue-50 rounded-xl">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span className="text-blue-600 font-bold text-sm">ℹ️</span>
                                     </div>
-                                    <span className="text-gray-600">Register your preferred alias</span>
-                                </div>
-                                <div className="flex items-center space-x-3 text-sm">
-                                    <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                        <span className="text-green-600 font-semibold text-xs">2</span>
+                                    <div>
+                                        <p className="text-blue-800 text-sm font-semibold">First Time Setup</p>
+                                        <p className="text-blue-700 text-xs">You only need to do this once to create your paymail address</p>
                                     </div>
-                                    <span className="text-gray-600">Share {alias || 'alias'}@{host} to receive BSV</span>
-                                </div>
-                                <div className="flex items-center space-x-3 text-sm">
-                                    <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                        <span className="text-purple-600 font-semibold text-xs">3</span>
-                                    </div>
-                                    <span className="text-gray-600">Return here to collect your payments</span>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Benefits */}
-                        <div className="mt-6 grid grid-cols-3 gap-4">
-                            <div className="text-center">
-                                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                                    <span className="text-blue-600 font-bold">⚡</span>
-                                </div>
-                                <p className="text-xs text-gray-600 font-medium">Instant</p>
+                    {/* Step 2: Collect Payments */}
+                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+                        {/* Step 2 Header */}
+                        <div className="bg-gradient-to-r from-emerald-600 to-green-600 p-6 text-center relative">
+                            <div className="absolute top-4 left-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">2</span>
                             </div>
-                            <div className="text-center">
-                                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                                    <span className="text-green-600 font-bold">🔒</span>
+                            <h2 className="text-2xl font-bold text-white mb-2">Collect Payments</h2>
+                            <p className="text-emerald-100">Retrieve BSV sent to your paymail address</p>
+                        </div>
+                        
+                        {/* Step 2 Content */}
+                        <div className="p-8">
+                            <div className="space-y-6">
+                                <div className="text-center">
+                                    <div className="w-16 h-16 bg-gradient-to-r from-emerald-100 to-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <span className="text-3xl">💰</span>
+                                    </div>
+                                    <p className="text-gray-600 text-sm mb-6">
+                                        Click below to check for and collect any BSV payments sent to your paymail address
+                                    </p>
                                 </div>
-                                <p className="text-xs text-gray-600 font-medium">Secure</p>
-                            </div>
-                            <div className="text-center">
-                                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                                    <span className="text-purple-600 font-bold">✨</span>
+
+                                <button
+                                    onClick={handleCollect}
+                                    disabled={collecting}
+                                    className="w-full py-4 text-xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg transform hover:scale-105"
+                                >
+                                    {collecting ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3 inline-block"></div>
+                                            Collecting Payments...
+                                        </>
+                                    ) : (
+                                        <>
+                                            💰 Collect Payments
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* Collection Status */}
+                                {collecting && (
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="animate-pulse w-3 h-3 bg-emerald-500 rounded-full"></div>
+                                                <span className="text-emerald-800 text-sm font-medium">Checking for transactions...</span>
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <div className="animate-pulse w-3 h-3 bg-blue-500 rounded-full delay-300"></div>
+                                                <span className="text-blue-800 text-sm font-medium">Processing wallet actions...</span>
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <div className="animate-pulse w-3 h-3 bg-purple-500 rounded-full delay-700"></div>
+                                                <span className="text-purple-800 text-sm font-medium">Acknowledging transactions...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step 2 Info */}
+                                <div className="p-4 bg-emerald-50 rounded-xl">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                            <span className="text-emerald-600 font-bold text-sm">🔄</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-emerald-800 text-sm font-semibold">Recurring Action</p>
+                                            <p className="text-emerald-700 text-xs">Come back anytime to collect new payments</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p className="text-xs text-gray-600 font-medium">Simple</p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* How it works - moved to bottom */}
+                <div className="mt-8 bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">How it works</h3>
+                    <div className="grid md:grid-cols-3 gap-4">
+                        <div className="text-center">
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <span className="text-blue-600 font-bold">1</span>
+                            </div>
+                            <h4 className="font-semibold text-gray-800 mb-2">Register Once</h4>
+                            <p className="text-gray-600 text-sm">Create your unique paymail alias</p>
+                        </div>
+                        <div className="text-center">
+                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <span className="text-green-600 font-bold">2</span>
+                            </div>
+                            <h4 className="font-semibold text-gray-800 mb-2">Share Address</h4>
+                            <p className="text-gray-600 text-sm">Give out {alias || 'alias'}@{host} to receive BSV</p>
+                        </div>
+                        <div className="text-center">
+                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <span className="text-purple-600 font-bold">3</span>
+                            </div>
+                            <h4 className="font-semibold text-gray-800 mb-2">Collect Anytime</h4>
+                            <p className="text-gray-600 text-sm">Return to collect your payments</p>
                         </div>
                     </div>
                 </div>
