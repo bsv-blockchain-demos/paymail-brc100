@@ -158,12 +158,7 @@ export default function Home() {
             <div className="w-full max-w-lg">
                 {/* Header Section */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full mb-6 shadow-xl">
-                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                    </div>
-                    <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-cyan-700 bg-clip-text text-transparent mb-3">
+                    <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-cyan-700 bg-clip-text text-transparent p-5">
                         Paymail Bridge
                     </h1>
                     <p className="text-gray-600 text-xl font-medium">
@@ -176,7 +171,7 @@ export default function Home() {
                     {/* Card Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 text-center">
                         <h2 className="text-2xl font-bold text-white mb-2">Register Your Alias</h2>
-                        <p className="text-blue-100">Create a memorable paymail address for receiving BSV payments</p>
+                        <p className="text-blue-100">Create an alias to receieve paymail payments</p>
                     </div>
                     
                     {/* Card Content */}
