@@ -6,6 +6,25 @@ interface RegistrationResponse {
   [key: string]: string;
 }
 
+interface TransactionRecord {
+  tx: number[];
+  txid: string;
+  outputIndex: number;
+  satoshis: number;
+  script: string;
+  publicKey: string;
+  keyID: string;
+  identityKey: string;
+  alias: string;
+  derivationPrefix: string;
+  derivationSuffix: string;
+  senderIdentityKey: string;
+}
+
+interface CollectResponse {
+  transactions: TransactionRecord[]
+}
+
 interface ErrorResponse {
   error: string;
 }
@@ -13,6 +32,7 @@ interface ErrorResponse {
 export default function Home() {
     const [alias, setAlias] = useState<string>('')
     const [loading, setLoading] = useState<boolean>(false)
+    const [collecting, setCollecting] = useState<boolean>(false)
     const [success, setSuccess] = useState<boolean>(false)
     const [error, setError] = useState<string>('')
     const [registeredAlias, setRegisteredAlias] = useState<string>('')
@@ -81,6 +101,80 @@ export default function Home() {
         }
         
         setLoading(false)
+    }
+
+    const handleCollect = async (e: React.FormEvent) => {
+        try {
+            e.preventDefault()
+            setCollecting(true)
+            const keyID = new Date().toISOString()
+            const wallet = new WalletClient()
+            const data = Utils.toArray('please give me my transactions', 'utf8')
+            const protocolID = [0, 'paymail collect'] as WalletProtocol
+            const { publicKey: identityKey } = await wallet.getPublicKey({
+                identityKey: true
+            })
+            const { signature } = await wallet.createSignature({
+                counterparty: 'anyone',
+                keyID,
+                protocolID,
+                data
+            })
+            const response = await fetch('/api/brc-100/collect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    identityKey,
+                    protocolID,
+                    keyID,
+                    signature
+                })
+            })
+
+            if (response.ok) {
+                const result: CollectResponse = await response.json()
+
+                if (result.transactions.length === 0) {
+                    setError('No transactions found')
+                    return
+                }
+
+                result.transactions.forEach(async t => {
+                    const { accepted } = await wallet.internalizeAction({
+                        tx: t.tx,
+                        description: 'collect paymail transactions',
+                        labels: ['paymail'],
+                        outputs: [
+                            {
+                                protocol: 'wallet payment',
+                                outputIndex: t.outputIndex,
+                                paymentRemittance: {
+                                    derivationPrefix: t.derivationPrefix,
+                                    derivationSuffix: t.derivationSuffix,
+                                    senderIdentityKey: t.senderIdentityKey,
+                                }
+                            }
+                        ]
+                    })
+                    if (accepted) {
+                        
+                    }
+                })
+                
+                setAlias('')
+            } else {
+                const errorData: ErrorResponse = await response.json()
+                setError(errorData.error || 'Registration failed')
+            }
+            
+        } catch (error) {
+            console.error('Error collecting payment:', error)
+            setError('Failed to collect payment. Please try again.')
+        } finally {
+            setCollecting(false)
+        }
     }
 
     const resetForm = () => {

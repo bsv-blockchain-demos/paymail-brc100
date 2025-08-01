@@ -9,6 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@bsv/message-box-client": "^1.1.10",
     "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "^1.6.20",
     "@bsv/wallet-toolbox-client": "^1.5.20",

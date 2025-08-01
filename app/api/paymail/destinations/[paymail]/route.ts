@@ -1,7 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
-import { KeyDeriver, PrivateKey, WalletProtocol, P2PKH } from "@bsv/sdk"
+import { KeyDeriver, WalletProtocol, P2PKH, Utils } from "@bsv/sdk"
 import { dbc } from "@/lib/db"
-const key = PrivateKey.fromWif(process.env.SERVER_KEY || '')
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ paymail: string }> }) {
     const body = await req.json()
@@ -18,28 +17,48 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
     
 
     const keyDeriver = new KeyDeriver('anyone')
-    const protocolID = [0, 'paymail destination'] as WalletProtocol
-    const keyID = new Date().toISOString()
+    const protocolID = [2, '3241645161d8'] as WalletProtocol
+    const derivationPrefix = Utils.toBase64(Utils.toArray(alias, 'utf8'))
+    const derivationSuffix =  Utils.toBase64(Utils.toArray(new Date().toISOString(), 'utf8'))
+    const senderIdentityKey = keyDeriver.identityKey
+    const keyID = derivationPrefix + ' ' + derivationSuffix
     const publicKey = keyDeriver.derivePublicKey(protocolID, keyID, identityKey)
 
+    const p2pkh = new P2PKH()
+    const script = p2pkh.lock(publicKey.toAddress()).toHex()
+    
     const destinations = await dbc('destinations')
     const success = await destinations.insertOne({
       publicKey: publicKey.toString(),
       satoshis,
       keyID,
+      derivationPrefix,
+      derivationSuffix,
+      senderIdentityKey,
       alias,
       identityKey,
+      script,
     })
     if (!success) return NextResponse.json({ error: 'Failed to register destination' }, { status: 400 })
 
-    const p2pkh = new P2PKH()
     return NextResponse.json({
       reference: keyID,
       outputs: [
         {
           satoshis,
-          script: p2pkh.lock(publicKey.toAddress()).toHex()
+          script
         }
       ]
     }, { status: 200 })
+}
+
+export async function OPTIONS(request: Request) {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  })
 }
