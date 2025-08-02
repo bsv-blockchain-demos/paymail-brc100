@@ -84,6 +84,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
 
     // Fetch BEEF data with fallback logic
     const beefTx = await fetchBeefWithFallback(tx)
+
+    // SPV
+    const valid = await beefTx.verify()
+    if (!valid) return NextResponse.json({ error: 'Transaction is not valid' }, { status: 400 })
+
     const beef = beefTx.toAtomicBEEF()
 
     // save the tx for the user to pickup.
