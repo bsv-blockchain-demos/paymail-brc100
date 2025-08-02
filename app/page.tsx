@@ -7,7 +7,7 @@ interface RegistrationResponse {
 }
 
 interface TransactionRecord {
-  tx: number[];
+  beef: number[];
   txid: string;
   outputIndex: number;
   satoshis: number;
@@ -127,6 +127,7 @@ export default function Home() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    data,
                     identityKey,
                     protocolID,
                     keyID,
@@ -144,8 +145,9 @@ export default function Home() {
 
                 const txids: string[] = []
                 result.transactions.forEach(async t => {
+                    console.log({t})
                     const { accepted } = await wallet.internalizeAction({
-                        tx: t.tx,
+                        tx: t.beef,
                         description: 'collect paymail transactions',
                         labels: ['paymail'],
                         outputs: [

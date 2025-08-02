@@ -18,10 +18,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
     
     const beefTx = Transaction.fromHexBEEF(beef)
     let paid = false
-    beefTx.outputs.map(output => {
+    let outputIndex = 0
+    beefTx.outputs.map((output, vout) => {
       if (output.lockingScript.toHex() === document.script) {
         if (output.satoshis === document.satoshis) {
           paid = true
+          outputIndex = vout
         }
       }
     })
@@ -44,6 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
     const success = await transactions.insertOne({
       beef: beefBytes,
       txid,
+      outputIndex,
       reference,
       metadata,
       alias,

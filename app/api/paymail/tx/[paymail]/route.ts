@@ -62,15 +62,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
     const destinations = await dbc('destinations')
     const document = await destinations.findOne({ reference })
     if (!document) return NextResponse.json({ error: 'Destination not found' }, { status: 404 })
-    const { alias: documentedAlias} = document
+    const { alias: documentedAlias } = document
     if (documentedAlias !== alias) return NextResponse.json({ error: 'Alias mismatch' }, { status: 400 })
     
     const tx = Transaction.fromHex(hex)
     let paid = false
-    tx.outputs.map(output => {
+    let outputIndex = 0
+    tx.outputs.map((output, vout) => {
       if (output.lockingScript.toHex() === document.script) {
         if (output.satoshis === document.satoshis) {
           paid = true
+          outputIndex = vout
         }
       }
     })
@@ -96,6 +98,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
     const success = await transactions.insertOne({
       beef,
       txid,
+      outputIndex,
       reference,
       metadata,
       alias,
@@ -105,7 +108,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
       publicKey: document.publicKey,
       identityKey: document.identityKey,
       keyID: document.keyID,
-      acknowledged: false
+      acknowledged: false,
+      derivationPrefix: document.derivationPrefix,
+      derivationSuffix: document.derivationSuffix,
+      senderIdentityKey: document.senderIdentityKey,
     })
     if (!success) return NextResponse.json({ error: 'Failed to save transaction' }, { status: 400 })
     

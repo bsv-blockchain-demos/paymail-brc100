@@ -32,6 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
       publicKey: publicKey.toString(),
       satoshis,
       keyID,
+      reference: keyID,
       derivationPrefix,
       derivationSuffix,
       senderIdentityKey,

@@ -13,6 +13,7 @@ interface RequestBody {
 export async function POST(req: NextRequest) {
     try {
         const body: RequestBody = await req.json()
+
         const { data, identityKey, protocolID, keyID, signature } = body
 
         // Check keyID timestamp to prevent replay attacks
@@ -23,11 +24,9 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: 'Request expired or invalid timestamp' }, { status: 400 })
         }
 
-        const alias = Utils.toUTF8(data)
-
-        // Basic alias validation
-        if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
-            return Response.json({ error: 'Alias can only contain letters, numbers, hyphens, and underscores' }, { status: 400 })
+        const msg = Utils.toUTF8(data)
+        if (msg !== 'please give me my transactions') {
+            return Response.json({ error: 'Invalid message' }, { status: 400 })
         }
 
         const wallet = new ProtoWallet('anyone')
@@ -38,26 +37,12 @@ export async function POST(req: NextRequest) {
             keyID,
             counterparty: identityKey
         })
-        if (!valid) return Response.json({ error: 'Invalid signature' }, { status: 400 })      
-    
+        if (!valid) return Response.json({ error: 'Invalid signature' }, { status: 400 })   
 
-        // check if alias is available
-        const aliases = await dbc('aliases')
-        const existingRecord = await aliases.findOne({ alias })
-        if (existingRecord) return Response.json({ error: 'Alias already exists' }, { status: 400 })
+        const txc = await dbc('transactions')
+        const transactions = await txc.find({ acknowledged: false, identityKey }).toArray()
 
-        // if yes then create a record mapping the alias to the identityKey and return success
-        const success = await aliases.insertOne({ 
-            alias, 
-            data,
-            signature,
-            protocolID,
-            keyID,
-            identityKey
-        })
-        if (!success) return Response.json({ error: 'Failed to register alias' }, { status: 400 })
-
-        return Response.json({ [alias]: identityKey }, { status: 200 })
+        return Response.json({ transactions }, { status: 200 })
     } catch (error) {
         console.log({ error })
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
