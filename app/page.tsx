@@ -35,6 +35,7 @@ export default function Home() {
     const [collecting, setCollecting] = useState<boolean>(false)
     const [success, setSuccess] = useState<boolean>(false)
     const [error, setError] = useState<string>('')
+    const [status, setStatus] = useState<string>('')
     const [registeredAlias, setRegisteredAlias] = useState<string>('')
 
     // Get host from environment or use default
@@ -108,6 +109,7 @@ export default function Home() {
             e.preventDefault()
             setCollecting(true)
             setError('')
+            setStatus('Checking inbound transactions...')
             const keyID = new Date().toISOString()
             const wallet = new WalletClient()
             const data = Utils.toArray('please give me my transactions', 'utf8')
@@ -139,58 +141,64 @@ export default function Home() {
                 const result: CollectResponse = await response.json()
 
                 if (result.transactions.length === 0) {
-                    setError('No transactions found')
+                    setStatus('No transactions found')
                     return
                 }
 
-                const txids: string[] = []
                 result.transactions.forEach(async t => {
+                    setStatus('Sending tx to your wallet')
                     console.log({t})
-                    const { accepted } = await wallet.internalizeAction({
-                        tx: t.beef,
-                        description: 'collect paymail transactions',
-                        labels: ['paymail'],
-                        outputs: [
-                            {
-                                protocol: 'wallet payment',
-                                outputIndex: t.outputIndex,
-                                paymentRemittance: {
-                                    derivationPrefix: t.derivationPrefix,
-                                    derivationSuffix: t.derivationSuffix,
-                                    senderIdentityKey: t.senderIdentityKey,
+                    try {
+                        const { accepted } = await wallet.internalizeAction({
+                            tx: t.beef,
+                            description: 'collect paymail transactions',
+                            labels: ['paymail'],
+                            outputs: [
+                                {
+                                    protocol: 'wallet payment',
+                                    outputIndex: t.outputIndex,
+                                    paymentRemittance: {
+                                        derivationPrefix: t.derivationPrefix,
+                                        derivationSuffix: t.derivationSuffix,
+                                        senderIdentityKey: t.senderIdentityKey,
+                                    }
                                 }
+                            ]
+                        })
+                        if (accepted) {
+                            const ackResponse = await fetch('/api/brc-100/ack', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    txids: [t.txid]
+                                })
+                            })
+            
+                            if (!ackResponse.ok) {
+                                setError('Failed to acknowledge transactions')
+                                return
                             }
-                        ]
-                    })
-                    if (accepted) {
-                        txids.push(t.txid)
+                            setStatus('Transaction ' + t.txid.slice(0, 8) + '... processed')
+                        } else {
+                            setStatus('Error processing transaction ' + t.txid.slice(0, 8) + '...')
+                        }
+                    } catch (error) {
+                        console.error('Error internalizing action:', error)
+                        setStatus('Error processing transaction ' + t.txid.slice(0, 8) + '...')
                     }
                 })
-
-                const ackResponse = await fetch('/api/brc-100/ack', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        txids
-                    })
-                })
-
-                if (!ackResponse.ok) {
-                    setError('Failed to acknowledge transactions')
-                    return
-                }
                 
                 setAlias('')
             } else {
                 const errorData: ErrorResponse = await response.json()
-                setError(errorData.error || 'Registration failed')
+                setStatus(errorData.error || 'Registration failed')
             }
             
         } catch (error) {
             console.error('Error collecting payment:', error)
-            setError('Failed to collect payment. Please try again.')
+            setStatus('Failed to collect payment. Please try again.')
         } finally {
             setCollecting(false)
         }
@@ -402,20 +410,12 @@ export default function Home() {
                                 </button>
 
                                 {/* Collection Status */}
-                                {collecting && (
+                                {status && (
                                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                                         <div className="space-y-3">
                                             <div className="flex items-center space-x-3">
-                                                <div className="animate-pulse w-3 h-3 bg-emerald-500 rounded-full"></div>
-                                                <span className="text-emerald-800 text-sm font-medium">Checking for transactions...</span>
-                                            </div>
-                                            <div className="flex items-center space-x-3">
                                                 <div className="animate-pulse w-3 h-3 bg-blue-500 rounded-full delay-300"></div>
-                                                <span className="text-blue-800 text-sm font-medium">Processing wallet actions...</span>
-                                            </div>
-                                            <div className="flex items-center space-x-3">
-                                                <div className="animate-pulse w-3 h-3 bg-purple-500 rounded-full delay-700"></div>
-                                                <span className="text-purple-800 text-sm font-medium">Acknowledging transactions...</span>
+                                                <span className="text-blue-800 text-sm font-medium">{status}</span>
                                             </div>
                                         </div>
                                     </div>
