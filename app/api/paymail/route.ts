@@ -5,11 +5,11 @@ export async function GET(req: NextRequest) {
         bsvalias: '1.0',
         capabilities: {
             "6745385c3fc0":false,
-            "pki": `${process.env.NEXT_PUBLIC_BASE_URL}/api/paymail/pki/{alias}@{domain.tld}`,
-            "f12f968c92d6": `${process.env.NEXT_PUBLIC_BASE_URL}/api/paymail/profile/{alias}@{domain.tld}`,
-            "2a40af698840": `${process.env.NEXT_PUBLIC_BASE_URL}/api/paymail/destinations/{alias}@{domain.tld}`,
-            "5c55a7fdb7bb": `${process.env.NEXT_PUBLIC_BASE_URL}/api/paymail/beef/{alias}@{domain.tld}`,
-            "5f1323cddf31": `${process.env.NEXT_PUBLIC_BASE_URL}/api/paymail/tx/{alias}@{domain.tld}`,
+            "pki": `https://${process.env.NEXT_PUBLIC_HOST}/api/paymail/pki/{alias}@{domain.tld}`,
+            "f12f968c92d6": `https://${process.env.NEXT_PUBLIC_HOST}/api/paymail/profile/{alias}@{domain.tld}`,
+            "2a40af698840": `https://${process.env.NEXT_PUBLIC_HOST}/api/paymail/destinations/{alias}@{domain.tld}`,
+            "5c55a7fdb7bb": `https://${process.env.NEXT_PUBLIC_HOST}/api/paymail/beef/{alias}@{domain.tld}`,
+            "5f1323cddf31": `https://${process.env.NEXT_PUBLIC_HOST}/api/paymail/tx/{alias}@{domain.tld}`,
         }
      }, { status: 200 })
 }
