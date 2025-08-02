@@ -56,7 +56,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
       publicKey: document.publicKey,
       identityKey: document.identityKey,
       keyID: document.keyID,
-      acknowledged: false
+      acknowledged: false,
+      derivationPrefix: document.derivationPrefix,
+      derivationSuffix: document.derivationSuffix,
+      senderIdentityKey: document.senderIdentityKey,
     })
     if (!success) return NextResponse.json({ error: 'Failed to save transaction' }, { status: 400 })
     
