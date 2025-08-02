@@ -1,6 +1,55 @@
 import { NextResponse, NextRequest } from "next/server";
-import { Transaction } from "@bsv/sdk"
+import { Transaction, Utils } from "@bsv/sdk"
 import { dbc } from "@/lib/db"
+import { queuedFetch } from "@/lib/woc"
+
+/**
+ * Fetch BEEF data for a transaction with fallback to input transactions
+ */
+async function fetchBeefWithFallback(tx: Transaction): Promise<Transaction> {
+    const txid = tx.id('hex')
+    
+    try {
+        // Try to get BEEF directly first
+        const beefResponse = await queuedFetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${txid}/beef`)
+        if (beefResponse.ok) {
+            const beefHex = await beefResponse.text()
+            return Transaction.fromHexBEEF(beefHex)
+        }
+    } catch (error) {
+        console.warn(`Failed to fetch BEEF for ${txid}, falling back to input transactions:`, error)
+    }
+    
+    // Fallback: fetch input transactions to build BEEF
+    const inputTxids = tx.inputs.map(input => input.sourceTXID).filter((txid): txid is string => txid !== undefined)
+    const uniqueTxids = Array.from(new Set(inputTxids))
+    
+    try {
+        // Fetch all input transactions with throttling
+        const inputTxPromises = uniqueTxids.map(async (inputTxid) => {
+            const response = await queuedFetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${inputTxid}/beef`)
+            if (response.ok) {
+              const sourceHex = await response.text()
+              const sourceTx = Transaction.fromHexBEEF(sourceHex)
+              tx.inputs.map(input => {
+                  if (input.sourceTXID === inputTxid) {
+                      input.sourceTransaction = sourceTx
+                  }
+              })
+            }
+            throw new Error(`Failed to fetch input tx ${inputTxid}`)
+        })
+        
+        await Promise.all(inputTxPromises)
+        
+        return tx
+        
+    } catch (error) {
+        console.error(`Failed to fetch input transactions for ${txid}:`, error)
+        // Last resort: return just the transaction hex
+        return tx
+    }
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ paymail: string }> }) {
     const body = await req.json()
@@ -32,9 +81,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
     if (arcRes.status !== 'success') return NextResponse.json({ error: 'Failed to broadcast transaction' }, { status: 400 })
     
     const txid = tx.id('hex')
+
+    // Fetch BEEF data with fallback logic
+    const beefTx = await fetchBeefWithFallback(tx)
+    const beef = beefTx.toAtomicBEEF()
+
     // save the tx for the user to pickup.
     const transactions = await dbc('transactions')
     const success = await transactions.insertOne({
+      beef,
       txid,
       reference,
       metadata,
