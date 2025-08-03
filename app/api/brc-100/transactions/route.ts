@@ -54,12 +54,17 @@ export async function POST(req: NextRequest) {
         const txc = await dbc('transactions')
         const transactions = await txc.find({ identityKey }).sort({ _id: -1 }).toArray()
 
-        // Map to only include the fields we need for display
+        // Map to include all fields needed for display and internalizeAction
         const transactionList = transactions.map((tx: any) => ({
             txid: tx.txid,
             satoshis: tx.satoshis,
             acknowledged: tx.acknowledged,
-            alias: tx.alias
+            alias: tx.alias,
+            beef: tx.beef,
+            outputIndex: tx.outputIndex,
+            derivationPrefix: tx.derivationPrefix,
+            derivationSuffix: tx.derivationSuffix,
+            senderIdentityKey: tx.senderIdentityKey
         }))
 
         return Response.json({ transactions: transactionList }, { status: 200 })
