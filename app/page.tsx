@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { WalletClient, Utils, WalletProtocol } from '@bsv/sdk'
+import { WalletClient, Utils, WalletProtocol, WalletInterface } from '@bsv/sdk'
 
 interface RegistrationResponse {
   [key: string]: string;
@@ -44,19 +44,71 @@ export default function Home() {
     const [transactions, setTransactions] = useState<Array<{txid: string, satoshis: number, acknowledged: boolean, alias: string}>>([])
     const [loadingTransactions, setLoadingTransactions] = useState<boolean>(false)
     const [transactionsError, setTransactionsError] = useState<string>('')
+    const [wallet, setWallet] = useState<WalletInterface | null>(null)
+    const [walletAuthenticated, setWalletAuthenticated] = useState<boolean>(false)
+    const [walletError, setWalletError] = useState<string>('')
 
     // Get host from environment or use default
     const host = process.env.NEXT_PUBLIC_HOST || 'paymail-bridge.example.com'
 
-    // Load aliases and transactions on page load
+    // Helper function to add timeout to promises
+    const withTimeout = (promise: Promise<unknown>, timeoutMs: number) => {
+        return Promise.race([
+            promise,
+            new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('Operation timeout')), timeoutMs)
+            )
+        ])
+    }
+
+    // Initialize wallet and check authentication
     useEffect(() => {
-        fetchAliases()
-        fetchTransactions()
+        const initializeWallet = async () => {
+            try {
+                const walletClient = new WalletClient()
+                setWallet(walletClient)
+                
+                // Check if wallet is authenticated with timeout
+                const { authenticated } = await Promise.race([
+                    walletClient.isAuthenticated(),
+                    new Promise<{ authenticated: boolean }>((resolve, reject) => 
+                        setTimeout(() => resolve({ authenticated: false }), 3000)
+                    )
+                ])
+                setWalletAuthenticated(authenticated)
+                
+                if (authenticated) {
+                    // Load aliases and transactions if wallet is authenticated
+                    fetchAliases()
+                    fetchTransactions()
+                } else {
+                    setWalletError('Wallet is not authenticated')
+                }
+            } catch (error) {
+                console.error('Wallet initialization error:', error)
+                setWalletError('Wallet is not available or connection timed out')
+                setWallet(null)
+                setWalletAuthenticated(false)
+            }
+        }
+
+        initializeWallet()
     }, [])
+
+    // Load aliases and transactions when wallet becomes available
+    useEffect(() => {
+        if (wallet && walletAuthenticated) {
+            fetchAliases()
+            fetchTransactions()
+        }
+    }, [wallet, walletAuthenticated])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        
+        if (!wallet) {
+            setError('Wallet is not available')
+            return
+        }
         if (!alias.trim()) {
             setError('Please enter an alias')
             return
@@ -74,7 +126,6 @@ export default function Home() {
 
         try {
             const keyID = new Date().toISOString()
-            const wallet = new WalletClient()
             const data = Utils.toArray(alias, 'utf8')
             const protocolID = [0, 'paymail alias'] as WalletProtocol
             const { signature } = await wallet.createSignature({
@@ -122,11 +173,14 @@ export default function Home() {
     const handleCollect = async (e: React.FormEvent) => {
         try {
             e.preventDefault()
+            if (!wallet) {
+                setError('Wallet is not available')
+                return
+            }
             setCollecting(true)
             setError('')
             setStatus('Checking inbound transactions...')
             const keyID = new Date().toISOString()
-            const wallet = new WalletClient()
             const data = Utils.toArray('please give me my transactions', 'utf8')
             const protocolID = [0, 'paymail collect'] as WalletProtocol
             const { publicKey: identityKey } = await wallet.getPublicKey({
@@ -229,11 +283,14 @@ export default function Home() {
 
     const fetchAliases = async () => {
         try {
+            if (!wallet) {
+                setError('Wallet is not available')
+                return
+            }
             setLoadingAliases(true)
             setAliasesError('')
             
             const keyID = new Date().toISOString()
-            const wallet = new WalletClient()
             const data = Utils.toArray('list my aliases', 'utf8')
             const protocolID = [0, 'paymail list aliases'] as WalletProtocol
             const { publicKey: identityKey } = await wallet.getPublicKey({
@@ -282,11 +339,14 @@ export default function Home() {
         }
         
         try {
+            if (!wallet) {
+                setError('Wallet is not available')
+                return
+            }
             setDeletingAlias(aliasToDelete)
             setAliasesError('')
             
             const keyID = new Date().toISOString()
-            const wallet = new WalletClient()
             const data = Utils.toArray(`delete alias ${aliasToDelete}`, 'utf8')
             const protocolID = [0, 'paymail delete alias'] as WalletProtocol
             const { publicKey: identityKey } = await wallet.getPublicKey({
@@ -331,11 +391,14 @@ export default function Home() {
 
     const fetchTransactions = async () => {
         try {
+            if (!wallet) {
+                setError('Wallet is not available')
+                return
+            }
             setLoadingTransactions(true)
             setTransactionsError('')
             
             const keyID = new Date().toISOString()
-            const wallet = new WalletClient()
             const data = Utils.toArray('list my transactions', 'utf8')
             const protocolID = [0, 'paymail list transactions'] as WalletProtocol
             const { publicKey: identityKey } = await wallet.getPublicKey({
@@ -554,7 +617,7 @@ export default function Home() {
 
                             {/* Aliases Error */}
                             {aliasesError && (
-                                <div className="mt-6 bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
+                                <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
                                     <div className="flex items-center space-x-2">
                                         <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                                         <p className="text-red-800 text-sm font-semibold">{aliasesError}</p>
@@ -564,7 +627,7 @@ export default function Home() {
 
                             {/* Loading Aliases */}
                             {loadingAliases && (
-                                <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
                                     <div className="flex items-center justify-center space-x-2">
                                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                                         <p className="text-blue-800 text-sm font-semibold">Loading your aliases...</p>
