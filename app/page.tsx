@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { WalletClient, Utils, WalletProtocol } from '@bsv/sdk'
 
 interface RegistrationResponse {
@@ -37,9 +37,22 @@ export default function Home() {
     const [error, setError] = useState<string>('')
     const [status, setStatus] = useState<string>('')
     const [registeredAlias, setRegisteredAlias] = useState<string>('')
+    const [aliases, setAliases] = useState<string[]>([])
+    const [loadingAliases, setLoadingAliases] = useState<boolean>(false)
+    const [aliasesError, setAliasesError] = useState<string>('')
+    const [deletingAlias, setDeletingAlias] = useState<string>('')
+    const [transactions, setTransactions] = useState<Array<{txid: string, satoshis: number, acknowledged: boolean, alias: string}>>([])
+    const [loadingTransactions, setLoadingTransactions] = useState<boolean>(false)
+    const [transactionsError, setTransactionsError] = useState<string>('')
 
     // Get host from environment or use default
     const host = process.env.NEXT_PUBLIC_HOST || 'paymail-bridge.example.com'
+
+    // Load aliases and transactions on page load
+    useEffect(() => {
+        fetchAliases()
+        fetchTransactions()
+    }, [])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -92,6 +105,8 @@ export default function Home() {
                 setSuccess(true)
                 setRegisteredAlias(alias.trim())
                 setAlias('')
+                // Refresh aliases list to include the new one
+                fetchAliases()
             } else {
                 const errorData: ErrorResponse = await response.json()
                 setError(errorData.error || 'Registration failed')
@@ -190,6 +205,8 @@ export default function Home() {
                     }
                 })
                 
+                // Refresh transactions list after collection
+                fetchTransactions()
                 setAlias('')
             } else {
                 const errorData: ErrorResponse = await response.json()
@@ -208,6 +225,156 @@ export default function Home() {
         setSuccess(false)
         setError('')
         setRegisteredAlias('')
+    }
+
+    const fetchAliases = async () => {
+        try {
+            setLoadingAliases(true)
+            setAliasesError('')
+            
+            const keyID = new Date().toISOString()
+            const wallet = new WalletClient()
+            const data = Utils.toArray('list my aliases', 'utf8')
+            const protocolID = [0, 'paymail list aliases'] as WalletProtocol
+            const { publicKey: identityKey } = await wallet.getPublicKey({
+                identityKey: true
+            })
+            const { signature } = await wallet.createSignature({
+                counterparty: 'anyone',
+                keyID,
+                protocolID,
+                data
+            })
+            
+            const response = await fetch('/api/brc-100/aliases', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    data,
+                    identityKey,
+                    protocolID,
+                    keyID,
+                    signature
+                })
+            })
+            
+            if (response.ok) {
+                const result = await response.json()
+                setAliases(result.aliases || [])
+            } else {
+                const errorData = await response.json()
+                setAliasesError(errorData.error || 'Failed to fetch aliases')
+            }
+        } catch (err) {
+            setAliasesError('Network error. Please try again.')
+            console.error('Fetch aliases error:', err)
+        } finally {
+            setLoadingAliases(false)
+        }
+    }
+
+    const deleteAlias = async (aliasToDelete: string) => {
+        // Confirm deletion
+        if (!confirm(`Are you sure you want to delete the alias "${aliasToDelete}@${host}"? This action cannot be undone.`)) {
+            return
+        }
+        
+        try {
+            setDeletingAlias(aliasToDelete)
+            setAliasesError('')
+            
+            const keyID = new Date().toISOString()
+            const wallet = new WalletClient()
+            const data = Utils.toArray(`delete alias ${aliasToDelete}`, 'utf8')
+            const protocolID = [0, 'paymail delete alias'] as WalletProtocol
+            const { publicKey: identityKey } = await wallet.getPublicKey({
+                identityKey: true
+            })
+            const { signature } = await wallet.createSignature({
+                counterparty: 'anyone',
+                keyID,
+                protocolID,
+                data
+            })
+            
+            const response = await fetch('/api/brc-100/delete-alias', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    data,
+                    identityKey,
+                    protocolID,
+                    keyID,
+                    signature,
+                    alias: aliasToDelete
+                })
+            })
+            
+            if (response.ok) {
+                // Remove the deleted alias from the local state
+                setAliases(prev => prev.filter(alias => alias !== aliasToDelete))
+            } else {
+                const errorData = await response.json()
+                setAliasesError(errorData.error || 'Failed to delete alias')
+            }
+        } catch (err) {
+            setAliasesError('Network error. Please try again.')
+            console.error('Delete alias error:', err)
+        } finally {
+            setDeletingAlias('')
+        }
+    }
+
+    const fetchTransactions = async () => {
+        try {
+            setLoadingTransactions(true)
+            setTransactionsError('')
+            
+            const keyID = new Date().toISOString()
+            const wallet = new WalletClient()
+            const data = Utils.toArray('list my transactions', 'utf8')
+            const protocolID = [0, 'paymail list transactions'] as WalletProtocol
+            const { publicKey: identityKey } = await wallet.getPublicKey({
+                identityKey: true
+            })
+            const { signature } = await wallet.createSignature({
+                counterparty: 'anyone',
+                keyID,
+                protocolID,
+                data
+            })
+            
+            const response = await fetch('/api/brc-100/transactions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    data,
+                    identityKey,
+                    protocolID,
+                    keyID,
+                    signature
+                })
+            })
+            
+            if (response.ok) {
+                const result = await response.json()
+                setTransactions(result.transactions || [])
+            } else {
+                const errorData = await response.json()
+                setTransactionsError(errorData.error || 'Failed to fetch transactions')
+            }
+        } catch (err) {
+            setTransactionsError('Network error. Please try again.')
+            console.error('Fetch transactions error:', err)
+        } finally {
+            setLoadingTransactions(false)
+        }
     }
 
     if (success) {
@@ -354,6 +521,57 @@ export default function Home() {
                                 </button>
                             </form>
 
+                            {/* Your Existing Aliases */}
+                            {aliases.length > 0 && (
+                                <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                    <h4 className="font-semibold text-blue-800 text-sm mb-3">Your Existing Aliases:</h4>
+                                    <div className="space-y-2">
+                                        {aliases.map((aliasName, index) => (
+                                            <div key={index} className="bg-white rounded-lg p-3 border border-blue-200 shadow-sm flex items-center justify-between">
+                                                <code className="text-blue-700 font-mono font-semibold text-sm">
+                                                    {aliasName}@{host}
+                                                </code>
+                                                <button
+                                                    onClick={() => deleteAlias(aliasName)}
+                                                    disabled={deletingAlias === aliasName}
+                                                    className="ml-3 px-3 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    title={`Delete ${aliasName}@${host}`}
+                                                >
+                                                    {deletingAlias === aliasName ? (
+                                                        <>
+                                                            <div className="animate-spin rounded-full h-3 w-3 border-b border-red-600 inline-block mr-1"></div>
+                                                            Deleting...
+                                                        </>
+                                                    ) : (
+                                                        'Delete'
+                                                    )}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Aliases Error */}
+                            {aliasesError && (
+                                <div className="mt-6 bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                        <p className="text-red-800 text-sm font-semibold">{aliasesError}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Loading Aliases */}
+                            {loadingAliases && (
+                                <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                                    <div className="flex items-center justify-center space-x-2">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                        <p className="text-blue-800 text-sm font-semibold">Loading your aliases...</p>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Step 1 Info */}
                             <div className="mt-6 p-4 bg-blue-50 rounded-xl">
                                 <div className="flex items-center space-x-3">
@@ -421,6 +639,75 @@ export default function Home() {
                                     </div>
                                 )}
 
+                                {/* Transaction History */}
+                                {transactions.length > 0 && (
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                                        <h4 className="font-semibold text-emerald-800 text-sm mb-3">Your Transaction History:</h4>
+                                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                                            {transactions.map((tx, index) => (
+                                                <div 
+                                                    key={index} 
+                                                    className="bg-white rounded-lg p-3 border border-emerald-200 shadow-sm hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer transition-colors"
+                                                    onClick={() => window.open(`https://whatsonchain.com/tx/${tx.txid}`, '_blank')}
+                                                    title={`View transaction ${tx.txid} on WhatsOnChain`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center space-x-2 mb-1">
+                                                                <code className="text-emerald-700 font-mono font-semibold text-xs truncate">
+                                                                    {tx.txid.length > 16 ? `${tx.txid.substring(0, 16)}...` : tx.txid}
+                                                                </code>
+                                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                                                    tx.acknowledged 
+                                                                        ? 'bg-green-100 text-green-800' 
+                                                                        : 'bg-yellow-100 text-yellow-800'
+                                                                }`}>
+                                                                    {tx.acknowledged ? 'Collected' : 'Pending'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-xs text-gray-600">
+                                                                Alias: {tx.alias}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-emerald-700 font-bold text-sm">
+                                                                {tx.satoshis.toLocaleString()} sats
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Transactions Error */}
+                                {transactionsError && (
+                                    <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                            <p className="text-red-800 text-sm font-semibold">{transactionsError}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Loading Transactions */}
+                                {loadingTransactions && (
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+                                        <div className="flex items-center justify-center space-x-2">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+                                            <p className="text-emerald-800 text-sm font-semibold">Loading transactions...</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* No Transactions Message */}
+                                {!loadingTransactions && transactions.length === 0 && !transactionsError && (
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+                                        <p className="text-gray-600 text-sm">No transactions found. Share your paymail address to receive payments!</p>
+                                    </div>
+                                )}
+
                                 {/* Step 2 Info */}
                                 <div className="p-4 bg-emerald-50 rounded-xl">
                                     <div className="flex items-center space-x-3">
@@ -441,27 +728,20 @@ export default function Home() {
                 {/* How it works - moved to bottom */}
                 <div className="mt-8 bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">How it works</h3>
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid md:grid-cols-2 gap-4">
                         <div className="text-center">
                             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <span className="text-blue-600 font-bold">1</span>
                             </div>
-                            <h4 className="font-semibold text-gray-800 mb-2">Register Once</h4>
-                            <p className="text-gray-600 text-sm">Create your unique paymail alias</p>
+                            <h4 className="font-semibold text-gray-800 mb-2">Register & View</h4>
+                            <p className="text-gray-600 text-sm">Create aliases and see all your paymail addresses</p>
                         </div>
                         <div className="text-center">
                             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <span className="text-green-600 font-bold">2</span>
                             </div>
-                            <h4 className="font-semibold text-gray-800 mb-2">Share Address</h4>
-                            <p className="text-gray-600 text-sm">Give out {alias || 'alias'}@{host} to receive BSV</p>
-                        </div>
-                        <div className="text-center">
-                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <span className="text-purple-600 font-bold">3</span>
-                            </div>
-                            <h4 className="font-semibold text-gray-800 mb-2">Collect Anytime</h4>
-                            <p className="text-gray-600 text-sm">Return to collect your payments</p>
+                            <h4 className="font-semibold text-gray-800 mb-2">Share & Collect</h4>
+                            <p className="text-gray-600 text-sm">Give out your addresses and collect BSV payments</p>
                         </div>
                     </div>
                 </div>
