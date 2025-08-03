@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
-import { KeyDeriver, WalletProtocol, P2PKH, Utils } from "@bsv/sdk"
+import { KeyDeriver, WalletProtocol, P2PKH, Utils, PublicKey } from "@bsv/sdk"
 import { dbc } from "@/lib/db"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ paymail: string }> }) {
@@ -10,12 +10,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pay
     const [alias, domain] = paymail.split('@')
     if (domain !== process.env.NEXT_PUBLIC_HOST) return NextResponse.json({ error: 'Invalid domain' }, { status: 400 })
     
+    let identityKey: string
     const aliases = await dbc('aliases')
     const document = await aliases.findOne({ alias })
-    if (!document) return NextResponse.json({ error: 'Alias not found' }, { status: 404 })
-    const { identityKey } = document
+    if (!document) {
+      console.log('Alias not found, using alias as identityKey if possible')
+      try {
+        const publicKey = PublicKey.fromString(alias)
+        identityKey = publicKey.toString()
+      } catch (error) {
+        console.log('Invalid pubkey')
+        return NextResponse.json({ error: 'Invalid pubkey' }, { status: 400 })
+      }
+    } else {
+      identityKey = document!.identityKey
+    }
     
-
     const keyDeriver = new KeyDeriver('anyone')
     const protocolID = [2, '3241645161d8'] as WalletProtocol
     const derivationPrefix = Utils.toBase64(Utils.toArray(alias, 'utf8'))
