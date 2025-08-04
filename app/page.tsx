@@ -47,6 +47,9 @@ export default function Home() {
     const [wallet, setWallet] = useState<WalletInterface | null>(null)
     const [walletAuthenticated, setWalletAuthenticated] = useState<boolean>(false)
     const [walletError, setWalletError] = useState<string>('')
+    const [manualIdentityKey, setManualIdentityKey] = useState<string>('')
+    const [manualMode, setManualMode] = useState<boolean>(false)
+    const [manualAlias, setManualAlias] = useState<string>('')
 
     // Get host from environment or use default
     const host = process.env.NEXT_PUBLIC_HOST || 'paymail-bridge.example.com'
@@ -83,12 +86,14 @@ export default function Home() {
                     fetchTransactions()
                 } else {
                     setWalletError('Wallet is not authenticated')
+                    setManualMode(true)
                 }
             } catch (error) {
                 console.error('Wallet initialization error:', error)
                 setWalletError('Wallet is not available or connection timed out')
                 setWallet(null)
                 setWalletAuthenticated(false)
+                setManualMode(true)
             }
         }
 
@@ -281,6 +286,135 @@ export default function Home() {
         setRegisteredAlias('')
     }
 
+    const handleManualRegister = async (e: React.FormEvent) => {
+        e.preventDefault()
+        
+        if (!manualIdentityKey.trim()) {
+            setError('Please enter an identity key')
+            return
+        }
+
+        setLoading(true)
+        setError('')
+        setSuccess(false)
+
+        try {
+            const response = await fetch('/api/brc-100/register-identity-key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    identityKey: manualIdentityKey.trim()
+                })
+            })
+
+            if (response.ok) {
+                const result = await response.json()
+                setSuccess(true)
+                setManualAlias(result.alias)
+                setRegisteredAlias(result.paymail)
+                setManualIdentityKey('')
+                // Refresh aliases list to include the new one
+                fetchManualAliases()
+            } else {
+                const errorData = await response.json()
+                setError(errorData.error || 'Registration failed')
+            }
+        } catch (err) {
+            setError('Network error. Please try again.')
+            console.error('Manual registration error:', err)
+        }
+        
+        setLoading(false)
+    }
+
+    const fetchManualAliases = async () => {
+        if (!manualIdentityKey) return
+        
+        try {
+            setLoadingAliases(true)
+            setAliasesError('')
+            
+            // For manual mode, we just show the current registered alias
+            // In a real implementation, you might want to query the database
+            if (manualAlias) {
+                setAliases([manualAlias])
+            }
+        } catch (err) {
+            setAliasesError('Failed to fetch aliases')
+            console.error('Fetch manual aliases error:', err)
+        } finally {
+            setLoadingAliases(false)
+        }
+    }
+
+    const fetchManualTransactions = async () => {
+        if (!manualIdentityKey) return
+        
+        try {
+            setLoadingTransactions(true)
+            setTransactionsError('')
+            
+            const response = await fetch('/api/brc-100/transactions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    data: [0], // dummy data
+                    identityKey: manualIdentityKey,
+                    protocolID: [0, 'manual'],
+                    keyID: 'manual',
+                    signature: new Array(64).fill(0) // dummy signature
+                })
+            })
+            
+            if (response.ok) {
+                const result = await response.json()
+                setTransactions(result.transactions || [])
+            } else {
+                const errorData = await response.json()
+                setTransactionsError(errorData.error || 'Failed to fetch transactions')
+            }
+        } catch (err) {
+            setTransactionsError('Network error. Please try again.')
+            console.error('Fetch manual transactions error:', err)
+        } finally {
+            setLoadingTransactions(false)
+        }
+    }
+
+    const handleTransactionClick = async (transaction: any) => {
+        if (!manualMode) return
+        
+        try {
+            const internalizeActionArgs = {
+                tx: transaction.beef,
+                description: 'collect paymail transactions',
+                labels: ['paymail'],
+                outputs: [
+                    {
+                        protocol: 'wallet payment',
+                        outputIndex: transaction.outputIndex,
+                        paymentRemittance: {
+                            derivationPrefix: transaction.derivationPrefix,
+                            derivationSuffix: transaction.derivationSuffix,
+                            senderIdentityKey: transaction.senderIdentityKey,
+                        }
+                    }
+                ]
+            }
+            
+            const jsonString = JSON.stringify(internalizeActionArgs, null, 2)
+            await navigator.clipboard.writeText(jsonString)
+            setStatus(`Transaction ${transaction.txid.slice(0, 8)}... copied to clipboard`)
+        } catch (error) {
+            console.error('Failed to copy to clipboard:', error)
+            setStatus('Failed to copy transaction data')
+        }
+    }
+
     const fetchAliases = async () => {
         try {
             if (!wallet) {
@@ -460,10 +594,12 @@ export default function Home() {
                         <div className="p-8 space-y-6">
                             <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
                                 <div className="text-center">
-                                    <p className="text-sm text-gray-600 mb-3">Your new paymail address:</p>
+                                    <p className="text-sm text-gray-600 mb-3">
+                                        {manualMode ? 'Your registered paymail address:' : 'Your new paymail address:'}
+                                    </p>
                                     <div className="bg-white rounded-lg p-4 border-2 border-dashed border-blue-300 shadow-sm">
                                         <code className="text-xl font-mono font-bold text-blue-700">
-                                            {registeredAlias}@{host}
+                                            {registeredAlias}
                                         </code>
                                     </div>
                                 </div>
@@ -475,9 +611,14 @@ export default function Home() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                                     </svg>
                                     <div>
-                                        <h4 className="font-semibold text-amber-800 text-sm">Important Reminder</h4>
+                                        <h4 className="font-semibold text-amber-800 text-sm">
+                                            {manualMode ? 'Next Steps' : 'Important Reminder'}
+                                        </h4>
                                         <p className="text-amber-700 text-sm mt-1">
-                                            Return to this app to collect your inbound BSV payments. Your funds will be held securely until you retrieve them.
+                                            {manualMode 
+                                                ? 'Share your paymail address to receive payments. Return here to fetch transactions and copy JSON for manual processing in Metanet Desktop.'
+                                                : 'Return to this app to collect your inbound BSV payments. Your funds will be held securely until you retrieve them.'
+                                            }
                                         </p>
                                     </div>
                                 </div>
@@ -526,63 +667,96 @@ export default function Home() {
                             <div className="absolute top-4 left-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
                                 <span className="text-white font-bold text-sm">1</span>
                             </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Register Your Alias</h2>
-                            <p className="text-blue-100">One-time setup for your paymail address</p>
+                            <h2 className="text-2xl font-bold text-white mb-2">
+                                {manualMode ? 'Register IdentityKey for Metanet Desktop Funding' : 'Register Your Alias'}
+                            </h2>
+                            <p className="text-blue-100">
+                                {manualMode ? 'Paste your identity key to register for funding' : 'One-time setup for your paymail address'}
+                            </p>
                         </div>
                         
                         {/* Step 1 Content */}
                         <div className="p-8">
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                <div className="space-y-3">
-                                    <label htmlFor="alias" className="block text-sm font-semibold text-gray-700">
-                                        Create Alias
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            id="alias"
-                                            type="text"
-                                            value={alias}
-                                            onChange={(e) => setAlias(e.target.value)}
-                                            placeholder="alias"
+                            {manualMode ? (
+                                <form onSubmit={handleManualRegister} className="space-y-6">
+                                    <div className="space-y-3">
+                                        <label htmlFor="identityKey" className="block text-sm font-semibold text-gray-700">
+                                            Identity Key (Public Key)
+                                        </label>
+                                        <textarea
+                                            id="identityKey"
+                                            value={manualIdentityKey}
+                                            onChange={(e) => setManualIdentityKey(e.target.value)}
+                                            placeholder="Paste your identity key here..."
                                             disabled={loading}
-                                            className="w-full px-4 py-4 pr-40 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                            autoComplete="off"
+                                            rows={4}
+                                            className="w-full px-4 py-4 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
                                         />
-                                        <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                                            <span className="text-gray-500 font-semibold text-lg">@{host}</span>
-                                        </div>
+                                        <p className="text-xs text-gray-500 font-medium">
+                                            ✓ Your paymail address will be generated from this key
+                                        </p>
+                                        {manualAlias && (
+                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                <p className="text-sm text-blue-800 font-medium">
+                                                    Your paymail: <span className="font-mono">{manualAlias}@{host}</span>
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
-                                    <p className="text-xs text-gray-500 font-medium">
-                                        ✓ Letters, numbers, hyphens, and underscores only
-                                    </p>
+                                </form>
+                            ) : (
+                                <form onSubmit={handleSubmit} className="space-y-6">
+                                    <div className="space-y-3">
+                                        <label htmlFor="alias" className="block text-sm font-semibold text-gray-700">
+                                            Create Alias
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                id="alias"
+                                                type="text"
+                                                value={alias}
+                                                onChange={(e) => setAlias(e.target.value)}
+                                                placeholder="alias"
+                                                disabled={loading}
+                                                className="w-full px-4 py-4 pr-40 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                                autoComplete="off"
+                                            />
+                                            <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                                                <span className="text-gray-500 font-semibold text-lg">@{host}</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-gray-500 font-medium">
+                                            ✓ Letters, numbers, hyphens, and underscores only
+                                        </p>
+                                    </div>
+                                </form>
+                            )}
+
+                            {error && (
+                                <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                        <p className="text-red-800 text-sm font-semibold">{error}</p>
+                                    </div>
                                 </div>
+                            )}
 
-                                {error && (
-                                    <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                            <p className="text-red-800 text-sm font-semibold">{error}</p>
-                                        </div>
-                                    </div>
+                            <button
+                                onClick={manualMode ? handleManualRegister : handleSubmit}
+                                disabled={loading || (manualMode ? !manualIdentityKey.trim() : !alias.trim())}
+                                className="w-full py-4 text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg transform hover:scale-105"
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3 inline-block"></div>
+                                        Registering...
+                                    </>
+                                ) : (
+                                    <>
+                                        {manualMode ? 'Register Identity Key' : 'Register Alias'} →
+                                    </>
                                 )}
-
-                                <button
-                                    type="submit"
-                                    disabled={loading || !alias.trim()}
-                                    className="w-full py-4 text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg transform hover:scale-105"
-                                >
-                                    {loading ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3 inline-block"></div>
-                                            Registering...
-                                        </>
-                                    ) : (
-                                        <>
-                                            Register Alias →
-                                        </>
-                                    )}
-                                </button>
-                            </form>
+                            </button>
 
                             {/* Your Existing Aliases */}
                             {aliases.length > 0 && (
@@ -657,8 +831,12 @@ export default function Home() {
                             <div className="absolute top-4 left-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
                                 <span className="text-white font-bold text-sm">2</span>
                             </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Collect Payments</h2>
-                            <p className="text-emerald-100">Retrieve BSV sent to your paymail address</p>
+                            <h2 className="text-2xl font-bold text-white mb-2">
+                                {manualMode ? 'View Transactions for Manual Processing' : 'Collect Payments'}
+                            </h2>
+                            <p className="text-emerald-100">
+                                {manualMode ? 'Click transactions to copy JSON for Metanet Desktop' : 'Retrieve BSV sent to your paymail address'}
+                            </p>
                         </div>
                         
                         {/* Step 2 Content */}
@@ -669,23 +847,26 @@ export default function Home() {
                                         <span className="text-3xl">💰</span>
                                     </div>
                                     <p className="text-gray-600 text-sm mb-6">
-                                        Click below to check for and collect any BSV payments sent to your paymail address
+                                        {manualMode 
+                                            ? 'Click below to fetch transactions, then click individual transactions to copy JSON for manual processing in Metanet Desktop'
+                                            : 'Click below to check for and collect any BSV payments sent to your paymail address'
+                                        }
                                     </p>
                                 </div>
 
                                 <button
-                                    onClick={handleCollect}
-                                    disabled={collecting}
+                                    onClick={manualMode ? fetchManualTransactions : handleCollect}
+                                    disabled={collecting || loadingTransactions || (manualMode && !manualIdentityKey)}
                                     className="w-full py-4 text-xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg transform hover:scale-105"
                                 >
-                                    {collecting ? (
+                                    {(collecting || loadingTransactions) ? (
                                         <>
                                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3 inline-block"></div>
-                                            Collecting Payments...
+                                            {manualMode ? 'Loading Transactions...' : 'Collecting Payments...'}
                                         </>
                                     ) : (
                                         <>
-                                            💰 Collect Payments
+                                            {manualMode ? '📋 Fetch Transactions' : '💰 Collect Payments'}
                                         </>
                                     )}
                                 </button>
@@ -705,14 +886,26 @@ export default function Home() {
                                 {/* Transaction History */}
                                 {transactions.length > 0 && (
                                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                                        <h4 className="font-semibold text-emerald-800 text-sm mb-3">Your Transaction History:</h4>
+                                        <h4 className="font-semibold text-emerald-800 text-sm mb-3">
+                                            {manualMode ? 'Click transactions to copy JSON for Metanet Desktop:' : 'Your Transaction History:'}
+                                        </h4>
                                         <div className="space-y-2 max-h-48 overflow-y-auto">
                                             {transactions.map((tx, index) => (
                                                 <div 
                                                     key={index} 
-                                                    className="bg-white rounded-lg p-3 border border-emerald-200 shadow-sm hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer transition-colors"
-                                                    onClick={() => window.open(`https://whatsonchain.com/tx/${tx.txid}`, '_blank')}
-                                                    title={`View transaction ${tx.txid} on WhatsOnChain`}
+                                                    className={`bg-white rounded-lg p-3 border border-emerald-200 shadow-sm transition-colors ${
+                                                        manualMode 
+                                                            ? 'hover:bg-yellow-50 hover:border-yellow-300 cursor-copy'
+                                                            : 'hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer'
+                                                    }`}
+                                                    onClick={manualMode 
+                                                        ? () => handleTransactionClick(tx)
+                                                        : () => window.open(`https://whatsonchain.com/tx/${tx.txid}`, '_blank')
+                                                    }
+                                                    title={manualMode 
+                                                        ? `Click to copy internalizeAction JSON for ${tx.txid}`
+                                                        : `View transaction ${tx.txid} on WhatsOnChain`
+                                                    }
                                                 >
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex-1 min-w-0">
@@ -727,6 +920,11 @@ export default function Home() {
                                                                 }`}>
                                                                     {tx.acknowledged ? 'Collected' : 'Pending'}
                                                                 </span>
+                                                                {manualMode && (
+                                                                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                                                        📋 Click to Copy JSON
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                             <div className="text-xs text-gray-600">
                                                                 Alias: {tx.alias}
@@ -741,6 +939,14 @@ export default function Home() {
                                                 </div>
                                             ))}
                                         </div>
+                                        {manualMode && (
+                                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                                <p className="text-xs text-blue-800">
+                                                    💡 <strong>Manual Mode:</strong> Click any transaction above to copy its internalizeAction arguments as JSON. 
+                                                    Paste this JSON into Metanet Desktop to process the transaction manually.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
