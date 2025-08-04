@@ -920,15 +920,18 @@ export default function Home() {
                                                                 }`}>
                                                                     {tx.acknowledged ? 'Collected' : 'Pending'}
                                                                 </span>
-                                                                {manualMode && (
-                                                                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                                                                        📋 Click to Copy JSON
-                                                                    </span>
-                                                                )}
                                                             </div>
-                                                            <div className="text-xs text-gray-600">
+                                                            <div className="text-xs text-gray-600 mb-1">
                                                                 Alias: {tx.alias}
                                                             </div>
+                                                            {manualMode && (
+                                                                <div className="inline-flex items-center space-x-1 px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-md text-xs font-medium text-blue-700 shadow-sm">
+                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                                    </svg>
+                                                                    <span>Copy JSON</span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="text-right">
                                                             <div className="text-emerald-700 font-bold text-sm">
@@ -942,8 +945,8 @@ export default function Home() {
                                         {manualMode && (
                                             <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                                 <p className="text-xs text-blue-800">
-                                                    💡 <strong>Manual Mode:</strong> Click any transaction above to copy its internalizeAction arguments as JSON. 
-                                                    Paste this JSON into Metanet Desktop to process the transaction manually.
+                                                    💡 <strong>Manual Mode:</strong> Click any transaction above to copy it as JSON. 
+                                                    Paste this JSON into Metanet Desktop to process the transaction manually during WABless initialization.
                                                 </p>
                                             </div>
                                         )}
