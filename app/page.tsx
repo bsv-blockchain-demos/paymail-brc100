@@ -421,6 +421,7 @@ export default function Home() {
                 setError('Wallet is not available')
                 return
             }
+            setError('')
             setLoadingAliases(true)
             setAliasesError('')
             
