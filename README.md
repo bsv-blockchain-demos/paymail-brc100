@@ -7,7 +7,6 @@ Demo application that explores bridging Paymail identities with BRC‑29 payment
 Users can register their ofrntity publicKey against an alias which can then be used to collect
 payments via <alias>@paymail.us
 
-- Live demo: https://paymail-brc100-bridge.vercel.app
 - License: Apache-2.0
 
 ## Tech stack
