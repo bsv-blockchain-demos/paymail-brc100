@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { WalletClient, Utils, WalletProtocol, WalletInterface } from '@bsv/sdk'
+import { WalletClient, Utils, WalletProtocol, WalletInterface, Transaction, PrivateKey } from '@bsv/sdk'
+import { PaymailClient } from '@bsv/paymail/client'
 
 interface RegistrationResponse {
   [key: string]: string;
@@ -50,6 +51,13 @@ export default function Home() {
     const [manualIdentityKey, setManualIdentityKey] = useState<string>('')
     const [manualMode, setManualMode] = useState<boolean>(false)
     const [manualAlias, setManualAlias] = useState<string>('')
+    
+    // Send payment states
+    const [recipientPaymail, setRecipientPaymail] = useState<string>('')
+    const [sendAmount, setSendAmount] = useState<string>('')
+    const [sending, setSending] = useState<boolean>(false)
+    const [sendError, setSendError] = useState<string>('')
+    const [sendStatus, setSendStatus] = useState<string>('')
 
     // Get host from environment or use default
     const host = process.env.NEXT_PUBLIC_HOST || 'paymail-bridge.example.com'
@@ -575,6 +583,133 @@ export default function Home() {
         }
     }
 
+    // Email validation helper
+    const isValidEmail = (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        return emailRegex.test(email)
+    }
+
+    // Handle send payment
+    const handleSendPayment = async (e: React.FormEvent) => {
+        e.preventDefault()
+        
+        if (!wallet) {
+            setSendError('Wallet is not available')
+            return
+        }
+        
+        if (!recipientPaymail.trim()) {
+            setSendError('Please enter a paymail address')
+            return
+        }
+        
+        if (!isValidEmail(recipientPaymail.trim())) {
+            setSendError('Please enter a valid paymail address')
+            return
+        }
+        
+        if (!sendAmount.trim() || isNaN(Number(sendAmount)) || Number(sendAmount) <= 0) {
+            setSendError('Please enter a valid amount in satoshis')
+            return
+        }
+        
+        const satoshis = Number(sendAmount)
+        
+        setSending(true)
+        setSendError('')
+        setSendStatus('Getting payment destination...')
+        
+        try {
+            // Initialize PaymailClient
+            const paymailClient = new PaymailClient()
+            
+            setSendStatus('Resolving paymail address...')
+            
+            // Get P2P destinations for the paymail address
+            const destinations = await paymailClient.getP2pPaymentDestination(recipientPaymail.trim(), satoshis)
+            
+            if (!destinations || !destinations.outputs || destinations.outputs.length === 0) {
+                throw new Error('No payment destinations found for this paymail address')
+            }
+            
+            setSendStatus('Creating transaction...')
+            
+            // Create outputs from the destinations
+            const outputs = destinations.outputs.map((dest: any) => ({
+                lockingScript: dest.script,
+                satoshis: dest.satoshis,
+                outputDescription: 'P2P Payment Destination for ' + recipientPaymail
+            }))
+            
+            // Create the transaction using wallet's createAction
+            const result = await wallet.createAction({
+                description: `Send ${satoshis} satoshis to ${recipientPaymail}`,
+                outputs,
+                labels: ['paymail', 'outbound']
+            })
+            
+            if (!result.tx) {
+                throw new Error('Failed to create transaction')
+            }
+            
+            setSendStatus('Converting transaction format...')
+            
+            // Convert the transaction to the appropriate format
+            const transaction = Transaction.fromBEEF(result.tx)
+            
+            // Submit the transaction to the paymail server
+            setSendStatus('Submitting transaction...')
+
+            const anyone = new PrivateKey(1)
+            const publicKey = anyone.toPublicKey().toString()
+
+            const signature = paymailClient.createP2PSignature(transaction.id('hex'), anyone)
+
+            const metadata = {
+                sender: `${aliases?.[0] || '_'}@${host}`,
+                pubkey: publicKey,
+                signature,
+                note: 'BRC-100 Bridge paymail.us'
+            }
+            
+            // Try BEEF format first, then fallback to raw transaction
+            let submissionResult
+            try {
+                const beefHex = transaction.toHexBEEF()
+                submissionResult = await paymailClient.sendBeefTransactionP2P(
+                    recipientPaymail.trim(), 
+                    beefHex,
+                    destinations.reference || 'paymail-bridge-send'
+                )
+                setSendStatus('Payment sent via BEEF format')
+            } catch (beefError) {
+                console.log('BEEF not supported, trying raw transaction:', beefError)
+                setSendStatus('Sending via raw transaction...')
+                const rawTxHex = transaction.toHex()
+                submissionResult = await paymailClient.sendTransactionP2P(
+                    recipientPaymail.trim(), 
+                    rawTxHex,
+                    destinations.reference || 'paymail-bridge-send'
+                )
+                setSendStatus('Payment sent via raw transaction')
+            }
+            
+            const txid = transaction.id('hex') as string
+            setSendStatus(`Payment successful! TXID: ${txid.slice(0, 16)}...`)
+            
+            // Clear the form
+            setRecipientPaymail('')
+            setSendAmount('')
+            
+        } catch (error) {
+            console.error('Send payment error:', error)
+            setSendError(error instanceof Error ? error.message : 'Failed to send payment')
+            setSendStatus('')
+        } finally {
+            setSending(false)
+        }
+    }
+
     if (success) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-50 to-cyan-100 flex items-center justify-center p-6">
@@ -659,8 +794,8 @@ export default function Home() {
                     </p>
                 </div>
 
-                {/* Two-Step Process */}
-                <div className="grid md:grid-cols-2 gap-8">
+                {/* Three-Step Process */}
+                <div className="space-y-8">
                     {/* Step 1: Register Alias */}
                     <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
                         {/* Step 1 Header */}
@@ -996,12 +1131,122 @@ export default function Home() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Step 3: Send Payment */}
+                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+                        {/* Step 3 Header */}
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 text-center relative">
+                            <div className="absolute top-4 left-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">3</span>
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-2">
+                                Send Payment
+                            </h2>
+                            <p className="text-purple-100">
+                                Send BSV to any paymail address
+                            </p>
+                        </div>
+                        
+                        {/* Step 3 Content */}
+                        <div className="p-8">
+                            <form onSubmit={handleSendPayment} className="space-y-6">
+                                <div className="space-y-3">
+                                    <label htmlFor="recipientPaymail" className="block text-sm font-semibold text-gray-700">
+                                        Recipient Paymail Address
+                                    </label>
+                                    <input
+                                        id="recipientPaymail"
+                                        type="email"
+                                        value={recipientPaymail}
+                                        onChange={(e) => setRecipientPaymail(e.target.value)}
+                                        placeholder="recipient@example.com"
+                                        disabled={sending}
+                                        className="w-full px-4 py-4 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                                        autoComplete="off"
+                                    />
+                                    <p className="text-xs text-gray-500 font-medium">
+                                        ✓ Enter a valid paymail address (email format)
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label htmlFor="sendAmount" className="block text-sm font-semibold text-gray-700">
+                                        Amount (Satoshis)
+                                    </label>
+                                    <input
+                                        id="sendAmount"
+                                        type="number"
+                                        value={sendAmount}
+                                        onChange={(e) => setSendAmount(e.target.value)}
+                                        placeholder="1000"
+                                        min="1"
+                                        disabled={sending}
+                                        className="w-full px-4 py-4 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                                        autoComplete="off"
+                                    />
+                                    <p className="text-xs text-gray-500 font-medium">
+                                        ✓ Amount in satoshis (1 BSV = 100,000,000 sats)
+                                    </p>
+                                </div>
+
+                                {sendError && (
+                                    <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                            <p className="text-red-800 text-sm font-semibold">{sendError}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {sendStatus && (
+                                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="animate-pulse w-3 h-3 bg-purple-500 rounded-full delay-300"></div>
+                                                <span className="text-purple-800 text-sm font-medium">{sendStatus}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={sending || !recipientPaymail.trim() || !sendAmount.trim() || !wallet || !walletAuthenticated}
+                                    className="w-full py-4 text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg transform hover:scale-105"
+                                >
+                                    {sending ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3 inline-block"></div>
+                                            Sending Payment...
+                                        </>
+                                    ) : (
+                                        <>
+                                            💸 Send Payment
+                                        </>
+                                    )}
+                                </button>
+                            </form>
+
+                            {/* Step 3 Info */}
+                            <div className="mt-6 p-4 bg-purple-50 rounded-xl">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span className="text-purple-600 font-bold text-sm">💸</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-purple-800 text-sm font-semibold">Outbound Payments</p>
+                                        <p className="text-purple-700 text-xs">Send BSV instantly to any paymail address</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* How it works - moved to bottom */}
                 <div className="mt-8 bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">How it works</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid md:grid-cols-3 gap-4">
                         <div className="text-center">
                             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <span className="text-blue-600 font-bold">1</span>
@@ -1015,6 +1260,13 @@ export default function Home() {
                             </div>
                             <h4 className="font-semibold text-gray-800 mb-2">Share & Collect</h4>
                             <p className="text-gray-600 text-sm">Give out your addresses and collect BSV payments</p>
+                        </div>
+                        <div className="text-center">
+                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <span className="text-purple-600 font-bold">3</span>
+                            </div>
+                            <h4 className="font-semibold text-gray-800 mb-2">Send Payments</h4>
+                            <p className="text-gray-600 text-sm">Send BSV to any paymail address instantly</p>
                         </div>
                     </div>
                 </div>
