@@ -31,13 +31,14 @@ async function fetchBeefWithFallback(tx: Transaction): Promise<Transaction> {
             if (response.ok) {
               const sourceHex = await response.text()
               const sourceTx = Transaction.fromHexBEEF(sourceHex)
-              tx.inputs.map(input => {
+              tx.inputs.forEach(input => {
                   if (input.sourceTXID === inputTxid) {
                       input.sourceTransaction = sourceTx
                   }
               })
+            } else {
+              throw new Error(`Failed to fetch input tx ${inputTxid}: ${response.status}`)
             }
-            throw new Error(`Failed to fetch input tx ${inputTxid}`)
         })
         
         await Promise.all(inputTxPromises)
