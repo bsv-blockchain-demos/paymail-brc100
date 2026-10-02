@@ -1,97 +1,77 @@
-# Paymail ↔ BRC‑29 Bridge
+# Paymail to BRC-100 Bridge
 
-Demo application that explores bridging Paymail identities with BRC‑29 payment flows. The app is built with Next.js (TypeScript) and deployed on Vercel.
+A Next.js application that connects Paymail aliases with BRC-100 wallets and BRC-29 payment derivation. Users can register aliases, collect incoming payments into their wallet, inspect payment records and send payments to Paymail recipients.
 
-[Demo](https://paymail.us)
+[Hosted example](https://paymail.us/).
 
-Users can register their ofrntity publicKey against an alias which can then be used to collect
-payments via <alias>@paymail.us
+## How it works
 
-- License: Apache-2.0
+The service stores alias mappings, payment destinations and pending transactions in MongoDB. Its Paymail endpoints return receiving scripts and accept raw transactions or BEEF. The browser then retrieves payment records, asks the recipient wallet to internalise them and acknowledges successful collection.
 
-## Tech stack
+The normal alias-management flow uses wallet signatures. A separate manual mode supports registration by public identity key and copying transaction import arguments for use elsewhere.
 
-- Next.js (App Router)
-- TypeScript
-- Deployed on Vercel
+## Requirements
 
-## Getting started
+- Node.js 22 and npm.
+- MongoDB, locally or through a hosted connection.
+- A compatible BRC-100 wallet for signed registration, payment collection and sending.
+- A public HTTPS hostname for an externally reachable Paymail service.
 
-Prerequisites:
-- Node.js 18+ is recommended
+The raw-transaction delivery route uses mainnet WhatsOnChain endpoints. Network selection is not a complete application-wide setting; align the connected wallets and service integrations before sending funds.
 
-Install dependencies and run the development server:
+## Run locally
 
-```bash
-# install
-npm install
-# or
-yarn
-# or
-pnpm install
-# or
-bun install
-
-# develop
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```sh
+npm ci
+cp .env.example .env.local
 ```
 
-Then open http://localhost:3000 in your browser.
+Configure `.env.local`:
 
-Build and start in production mode:
+```dotenv
+NEXT_PUBLIC_HOST=localhost:3000
+MONGO_URI=mongodb://localhost:27017
+DB_NAME=paymail_bridge
+```
 
-```bash
+`NEXT_PUBLIC_HOST` is a hostname, optionally with a port, without a URL scheme or path. `MONGO_URI` and `DB_NAME` are used by [lib/db.ts](lib/db.ts), although they are absent from the supplied environment template. The defaults are shown above.
+
+```sh
+npm run dev -- --hostname 127.0.0.1
+```
+
+Open `http://localhost:3000`. Local HTTP is sufficient for browsing the interface, but capability responses construct **HTTPS** URLs. Testing Paymail discovery from other clients requires a reachable HTTPS origin and a matching `NEXT_PUBLIC_HOST`.
+
+## API layout
+
+| Path | Purpose |
+| --- | --- |
+| `/.well-known/bsvalias` | Rewritten to the Paymail capability document. |
+| `/api/paymail/` | Public-key, profile, destination and transaction-delivery routes. |
+| `/api/brc-100/` | Alias registration, collection, acknowledgement and transaction queries. |
+
+There is no required server spending key in the active configuration. Wallet operations in the interface use the connected user's wallet.
+
+## Current limitations
+
+Manual collection accepts dummy signatures, and transaction acknowledgement is not authenticated or scoped to the requesting identity. Public-key-only registration also does not prove control of that key. These paths need a consistent access-control design before the service can promise private payment records or authenticated account management.
+
+Transaction delivery can broadcast payments, and sending from the interface can spend wallet funds. Use a dedicated demonstration wallet when exercising these flows.
+
+## Build and checks
+
+```sh
+npm run type-check
 npm run build
-npm start
+npm start -- --hostname 127.0.0.1
 ```
 
-## Configuration
+The package uses Next.js 15 and React 19. It also defines a lint command, but no automated test script. Deployment needs MongoDB access and the same hostname configuration used to advertise Paymail capabilities.
 
-If the application requires environment variables (e.g., endpoints or credentials for Paymail or BRC‑29 services), create a `.env.local` file in the project root and define them there:
+- [app/page.tsx](app/page.tsx): browser wallet and manual workflows.
+- [app/api/](app/api/): Paymail and bridge endpoints.
+- [next.config.mjs](next.config.mjs): capability discovery rewrite.
 
-```
-# .env.local (example)
-# NEXT_PUBLIC_SOME_ENDPOINT=https://...
-# SOME_SERVER_SECRET=...
-```
+## Licence
 
-Note: Public variables must be prefixed with `NEXT_PUBLIC_` to be exposed to the browser.
-
-## Scripts
-
-Common package scripts you can expect in this project:
-
-- `dev` — Start the Next.js development server
-- `build` — Build the production bundle
-- `start` — Start the production server
-- `lint` — Lint the code (if configured)
-
-Run with your preferred package manager, e.g. `npm run dev`.
-
-## Development notes
-
-- This project uses the Next.js App Router and React Server Components by default.
-- TypeScript types and strictness can be adjusted in `tsconfig.json`.
-- Add or modify routes and UI in the `app/` directory.
-
-## Deployment
-
-The app is configured for Vercel. You can deploy by connecting the repository to Vercel or using the Vercel CLI. For alternative platforms, follow standard Next.js deployment guidance:
-- Next.js deployment docs: https://nextjs.org/docs/deployment
-- Vercel: https://vercel.com
-
-## Contributing
-
-Issues and pull requests are welcome. Please open an issue to discuss changes that might affect the public demo or interface.
-
-## Acknowledgements
-
-- Paymail specification and ecosystem
-- [BRC‑29](https://brc.dev/29)
-- Next.js by Vercel
+[Apache 2.0](LICENSE).
