@@ -74,4 +74,4 @@ The package uses Next.js 15 and React 19. It also defines a lint command, but no
 
 ## Licence
 
-[Apache 2.0](LICENSE).
+**Apache 2.0 licence.** See [LICENSE](LICENSE) for the full terms.
